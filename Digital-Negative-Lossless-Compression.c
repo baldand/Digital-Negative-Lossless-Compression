@@ -1,6 +1,6 @@
 #include <Python.h>
 
-#include "lj92.h"
+#include "src/mlv/liblj92/lj92.h"
 
 void demosaic(
     float** rawData,    /* holds preprocessed pixel values, rawData[i][j] corresponds to the ith row and jth column */
