@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!python3
 """
 DNG.py
 (c) Andrew Baldwin 2014
@@ -24,9 +24,9 @@ Logic to read and write DNG/CDNG file sets
 """
 
 # standard python imports
-import sys,struct,os,math,time,threading,Queue,traceback,wave
+import sys,struct,os,math,time,threading,queue,traceback,wave
 
-import LJ92
+import lj92
 
 class Type:
     # TIFF Type Format = (Tag TYPE value, Size in bytes of one instance)
@@ -45,7 +45,7 @@ class Type:
     Double = (12,8) # 64bit double IEEE
     IFD = (13,4) # IFD (Same as Long)
 
-Types = [(getattr(Type,n),n) for n in dir(Type) if n!="__doc__" and n!="__module__"]
+Types = [(getattr(Type,n),n) for n in dir(Type) if not n.startswith("__")]
 Types.sort()
 
 class Tag:
@@ -161,7 +161,7 @@ class Tag:
     BaselineExposureOffset = (51109,Type.Srational) # 1.4 Spec says rational but mentions negative values?
     NewRawImageDigest = (51111,Type.Byte)
 
-IfdNames = [n for n in dir(Tag) if n!="__doc__" and n!="__module__"]
+IfdNames = [n for n in dir(Tag) if not n.startswith("__")]
 IfdValues = [getattr(Tag,n) for n in IfdNames]
 IfdIdentifiers = [getattr(Tag,n)[0] for n in IfdNames]
 IfdTypes = [getattr(Tag,n)[1][0] for n in IfdNames]
@@ -184,12 +184,12 @@ class DNG(object):
         Will not read image data from file system
         Better if only metadata needed with minimum data read
         """
-        df = self.df = file(filename,'rb')
+        df = self.df = open(filename,'rb')
         df.seek(0,os.SEEK_END)
         l = self.dfl = df.tell()
         self.dp = 0
         df.seek(self.dp)
-        if self.log: print "DNG file",filename,"length",l
+        if self.log: print("DNG file",filename,"length",l)
         if self.autoparse: self.parse()
 
     def readFileIn(self,filename):
@@ -200,7 +200,7 @@ class DNG(object):
         df = file(filename,'rb')
         self.dd = df.read()
         df.close()
-        if self.log: print "DNG file",filename,"length",len(self.dd)
+        if self.log: print("DNG file",filename,"length",len(self.dd))
         if self.autoparse: self.parse()
 
     def readAll(self):
@@ -249,7 +249,7 @@ class DNG(object):
         This supports copying/modifying DNGs even with unknown tags
         since we should have everything we need when loading from existing file
         """
-        if self.log: print "Writing to",filename
+        if self.log: print("Writing to",filename)
         # Prepare everything in an array
         dl = 1000000
         b = bytearray(self.stripTotal + 1000000) # Size of the data + 1M to be sure
@@ -339,10 +339,10 @@ class DNG(object):
         h = self.readFrom(0,8)
         byteOrder = struct.unpack("<H",h[:2])[0]
         if byteOrder == 0x4949: # Little endian
-            if self.log: print "Little endian"
+            if self.log: print("Little endian")
             self.bo = "<"
         elif byteOrder == 0x4D4D: # Big endian
-            if self.log: print "Big endian"
+            if self.log: print("Big endian")
             self.bo = ">"
         valid,firstIfdOffset = struct.unpack(self.bo+"HI",h[2:])
         if valid != 42:
@@ -369,13 +369,13 @@ class DNG(object):
         def subFileType(self):
             t = self.subFileType
             if t&1:
-                if self.log: print "ReducedResolution"
+                if self.log: print("ReducedResolution")
             if t&1==0:
-                if self.log: print "FullResolution"
+                if self.log: print("FullResolution")
             if t&2:
-                if self.log: print "PartOfMultipage"
+                if self.log: print("PartOfMultipage")
             if t&4:
-                if self.log: print "TransparencyMask"
+                if self.log: print("TransparencyMask")
             return t
         def isFull(self):
             return self.subFileType&1==0
@@ -395,7 +395,7 @@ class DNG(object):
             if not self.length: raise IOError
             if not self.PlanarConfiguration: raise IOError
             if self.PlanarConfiguration != 1:
-                if self.log: print "Unsupported PlanarConfiguration = ",self.PlanarConfiguration
+                if self.log: print("Unsupported PlanarConfiguration = ",self.PlanarConfiguration)
                 raise IOError
             StripsPerImage = self.RowsPerStrip * self.length
             StripByteCounts = self.tags[Tag.StripByteCounts[0]][3]
@@ -486,7 +486,7 @@ class DNG(object):
 
     def readIfd(self,offset):
         count = struct.unpack(self.bo+"H",self.readFrom(offset,2))[0]
-        if self.log: print "IFD entries:",count
+        if self.log: print("IFD entries:",count)
         ifdEntryData = self.readFrom(offset+2,count*12+4)
         ifdFormat = self.bo + "HHII"
         ifd = DNG.IFD(self)
@@ -591,22 +591,22 @@ class DNG(object):
                 self.THUMB_IFD = ifd
         elif itag==Tag.ImageWidth[0]:
             ifd.width = ival
-            if self.log: print "Width:",ifd.width
+            if self.log: print("Width:",ifd.width)
         elif itag==Tag.ImageLength[0]:
             ifd.length = ival
-            if self.log: print "Length:",ifd.length
+            if self.log: print("Length:",ifd.length)
         elif itag==Tag.SubIFD[0]:
-            if self.log: print "Reading SubIFDs"
+            if self.log: print("Reading SubIFDs")
             for suboffset in values:
                 subifd,dummy = self.readIfd(suboffset)
                 if dummy!=0:
-                    print "Expected nextOffset after subIFD = 0!"
+                    print("Expected nextOffset after subIFD = 0!")
                 ifd.subIFDs.append(subifd)
         elif itag==Tag.EXIF_IFD[0]:
-            if self.log: print "Reading EXIF IFD"
+            if self.log: print("Reading EXIF IFD")
             ifd.EXIF_IFD,dummy = self.readIfd(ival)
             if dummy!=0:
-                print "Expected nextOffset after EXIF_IFD = 0!"
+                print("Expected nextOffset after EXIF_IFD = 0!")
         elif itag==Tag.RowsPerStrip[0]:
             ifd.RowsPerStrip = ival
         elif itag==Tag.PlanarConfiguration[0]:
@@ -619,7 +619,7 @@ class DNG(object):
             ifd.TileLength = ival
 
         ifdEntry = (itag,itype,icount,values)
-        if self.log: print IfdName,ifdEntry
+        if self.log: print(IfdName,ifdEntry)
         return ifdEntry
 
     def write(self,filename):
@@ -627,7 +627,7 @@ class DNG(object):
 
 def testDngDirRead(path):
     dngs = [i for i in os.listdir(sys.argv[1]) if i.lower().endswith(".dng")]
-    print "Reading DNGs (%d)"%len(dngs)
+    print("Reading DNGs (%d)"%len(dngs))
     count = 0
     last = time.time()
     for n in dngs:
@@ -635,7 +635,7 @@ def testDngDirRead(path):
             now = time.time()
             took = now-last
             rate = 10.0/took
-            print count,"...",took,rate
+            print(count,"...",took,rate)
             last = now
         fn = os.path.join(sys.argv[1],n)
         d = DNG(parse=False)
@@ -647,7 +647,7 @@ def testDngDirRead(path):
             full = d.FULL_IFD.stripsCombined()
         d.close()
         count+=1
-    print "Done"
+    print("Done")
 
 def testReadDng(filename):
     d = DNG(log=True,parse=True)
@@ -657,8 +657,8 @@ def testReadDng(filename):
             thumb = d.THUMB_IFD.stripsCombined()
         elif d.THUMB_IFD.hasTiles():
             thumb = d.THUMB_IFD.tiles()
-        print "Thumb:"
-        print len(thumb)
+        print("Thumb:")
+        print(len(thumb))
     if d.FULL_IFD:
         if d.FULL_IFD.hasStrips():
             full = d.FULL_IFD.stripsCombined()
@@ -667,7 +667,7 @@ def testReadDng(filename):
             # Should check here if it's really lossless JPEG....
             lj = LJ92.lj92()
             for fi,t in enumerate(full):
-                print fi,len(t)
+                print(fi,len(t))
                 lj.parse(t)
 
                 # For debugging/PoC just dump as raw PGM
@@ -679,8 +679,8 @@ def testReadDng(filename):
                 dump.write(im)
                 dump.close()
 
-        print "Full:"
-        print len(full)
+        print("Full:")
+        print(len(full))
     d.close()
 
 def testCopyDng(dngin,dngout):
