@@ -1,7 +1,10 @@
 from distutils.core import setup, Extension
 
-module1 = Extension('bitunpack', sources = ["bitunpack.c","amaze_demosaic_RT.c", "liblj92/lj92.c"],  extra_compile_args=['-msse2','-std=gnu99'], extra_link_args=[])
+module1 = Extension(
+    'lj92', 
+    sources = ["lj92.c","Digital-Negative-Lossless-Compression.c"],  
+    xtra_compile_args=['-msse2','-std=gnu99'], 
+    extra_link_args=[])
 
-
-setup ( name = "bitunpack", version = "2.0", description = "Fast bit unpacking functions", ext_modules = [module1])
+setup ( name = "lj92", version = "1.0", description = "Lossless JPEG 92 (de)compression", ext_modules = [module1])
 
